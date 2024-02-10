@@ -22,14 +22,53 @@ contract SignatureVerifierTest is Test {
         uint256 message = 22;
         (uint8 v, bytes32 r, bytes32 s) = _signMessageSimple(message);
 
-        bool verified  = signatureVerifier.verifySignerSimple(message, v, r, s, user.addr);
-        assertTrue(verified, "SignatureVerifier: invalid signature");
+        bool verified = signatureVerifier.verifySignerSimple(
+            message,
+            v,
+            r,
+            s,
+            user.addr
+        );
+        assertEq(verified, true, "SignatureVerifier: invalid signature");
+    }
+
+    function testVerifySignatureEIP191() public {
+        uint256 message = 23;
+        address intendedValidator = address(signatureVerifier);
+        (uint8 v, bytes32 r, bytes32 s) = _signMessageEIP191(
+            message,
+            intendedValidator
+        );
+
+        bool verified = signatureVerifier.verifySigner191(
+            message,
+            v,
+            r,
+            s,
+            user.addr
+        );
+
+        assertEq(verified, true);
     }
 
     function _signMessageSimple(
         uint256 message
     ) internal returns (uint8, bytes32, bytes32) {
         bytes32 digest = bytes32(message);
+        return vm.sign(user.key, digest);
+    }
+
+    function _signMessageEIP191(
+        uint256 message,
+        address intendedValidator
+    ) internal view returns (uint8, bytes32, bytes32) {
+        bytes1 prefix = bytes1(0x19);
+        bytes1 eip191Version = bytes1(0x00);
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(prefix, eip191Version, intendedValidator, message)
+        );
+
         return vm.sign(user.key, digest);
     }
 }
