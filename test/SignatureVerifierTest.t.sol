@@ -51,7 +51,6 @@ contract SignatureVerifierTest is Test {
         assertEq(verified, true);
     }
 
-
     function testVerifySignatureEIP712() public {
         uint256 message = 24;
         (uint8 v, bytes32 r, bytes32 s) = _signMessageEIP712(message);
@@ -67,6 +66,41 @@ contract SignatureVerifierTest is Test {
         assertEq(verified, true);
     }
 
+    // sig replay attack
+    function testSignatureCanBeReplayed() public {
+        uint256 message = 25;
+        // Sign a message
+        (uint8 v, bytes32 r, bytes32 s) = _signMessageEIP712(message);
+    
+        // verify the message
+
+        vm.prank(address(1));
+        bool verifiedOnce = signatureVerifier.verifySignerEIP712(
+            message,
+            v,
+            r,
+            s,
+            user.addr
+        );
+        console2.log("verifiedOnce result ", verifiedOnce);
+        console2.log("user1 addr ", user.addr);
+
+        vm.prank(address(2));
+        bool verifiedTwice = signatureVerifier.verifySignerEIP712(
+            message,
+            v,
+            r,
+            s,
+            user.addr
+        );
+        console2.log("verifiedTwice result ", verifiedTwice);
+        console2.log("user2 addr ", user.addr);
+
+        assertEq(verifiedOnce, true);
+        assertEq(verifiedTwice, true);
+        assertEq(verifiedOnce, verifiedTwice);
+
+    }
 
     // Sign tools
 
