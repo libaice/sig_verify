@@ -100,7 +100,7 @@ contract SignatureVerifier {
         uint256 number;
     }
 
-    bytes32 constant MESSAGE_TYPEHASH = keccak256("Message(uint256 message)");
+    bytes32 public constant MESSAGE_TYPEHASH = keccak256("Message(uint256 number)");
 
     function getSignerEIP712(
         uint256 message,
@@ -138,4 +138,7 @@ contract SignatureVerifier {
         require(signer == actualSigner);
         return true;
     }
+
+
+
 }

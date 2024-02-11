@@ -51,6 +51,25 @@ contract SignatureVerifierTest is Test {
         assertEq(verified, true);
     }
 
+
+    function testVerifySignatureEIP712() public {
+        uint256 message = 24;
+        (uint8 v, bytes32 r, bytes32 s) = _signMessageEIP712(message);
+
+        bool verified = signatureVerifier.verifySignerEIP712(
+            message,
+            v,
+            r,
+            s,
+            user.addr
+        );
+
+        assertEq(verified, true);
+    }
+
+
+    // Sign tools
+
     function _signMessageSimple(
         uint256 message
     ) internal returns (uint8, bytes32, bytes32) {
@@ -72,7 +91,27 @@ contract SignatureVerifierTest is Test {
         return vm.sign(user.key, digest);
     }
 
+    function _signMessageEIP712(
+        uint256 message
+    ) internal view returns (uint8, bytes32, bytes32) {
+        bytes1 prefix = bytes1(0x19);
+        bytes1 eip191Version = bytes1(0x01);
 
+        bytes32 hashedMessageStruct = keccak256(
+            abi.encode(
+                signatureVerifier.MESSAGE_TYPEHASH(),
+                SignatureVerifier.Message({number: message})
+            )
+        );
 
-
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                prefix,
+                eip191Version,
+                signatureVerifier.i_domain_separator(),
+                hashedMessageStruct
+            )
+        );
+        return vm.sign(user.key, digest);
+    }
 }
