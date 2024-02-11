@@ -71,7 +71,7 @@ contract SignatureVerifierTest is Test {
         uint256 message = 25;
         // Sign a message
         (uint8 v, bytes32 r, bytes32 s) = _signMessageEIP712(message);
-    
+
         // verify the message
 
         vm.prank(address(1));
@@ -99,7 +99,68 @@ contract SignatureVerifierTest is Test {
         assertEq(verifiedOnce, true);
         assertEq(verifiedTwice, true);
         assertEq(verifiedOnce, verifiedTwice);
+    }
 
+    // replay resistant
+
+    function testVerifySignatureReplayResistant() public {
+        uint256 message = 26;
+
+        // Sign a message
+        (uint8 v, bytes32 r, bytes32 s) = _signMessageReplayResistant(message);
+
+        SignatureVerifier.ReplayResistantMessage
+            memory messageStruct = getReplayResistantMessageStruct(message);
+
+        // Verify message
+        vm.prank(address(1));
+        bool verifiedOnce = signatureVerifier.verifySignerReplayResistant(
+            messageStruct,
+            v,
+            r,
+            s,
+            user.addr
+        );
+        console2.log("verifiedOnce result ", verifiedOnce);
+        assertEq(verifiedOnce, true);
+
+        vm.prank(address(2));
+        vm.expectRevert();
+        signatureVerifier.verifySignerReplayResistant(
+            messageStruct,
+            v,
+            r,
+            s,
+            user.addr
+        );
+    }
+
+    function testIncorrectSignatureAreNotVerified() public {
+        uint256 message = 27;
+        // Sign a message
+        (uint8 v, bytes32 r, bytes32 s) = _signMessageReplayResistant(message);
+
+        // make message wrong
+        if (v == type(uint8).max) {
+            v = v - 1;
+        } else {
+            v = v + 1;
+        }
+        
+        SignatureVerifier.ReplayResistantMessage
+            memory messageStruct = getReplayResistantMessageStruct(message);
+
+        // Verify message
+        vm.expectRevert();
+        bool verifiedOnce = signatureVerifier.verifySignerReplayResistant(
+            messageStruct,
+            v,
+            r,
+            s,
+            user.addr
+        );
+
+        assertEq(verifiedOnce, false);
     }
 
     // Sign tools
@@ -142,6 +203,50 @@ contract SignatureVerifierTest is Test {
             abi.encodePacked(
                 prefix,
                 eip191Version,
+                signatureVerifier.i_domain_separator(),
+                hashedMessageStruct
+            )
+        );
+        return vm.sign(user.key, digest);
+    }
+
+    uint256 public constant DEADLINE_EXTENSION = 100;
+
+    function getReplayResistantMessageStruct(
+        uint256 message
+    ) public view returns (SignatureVerifier.ReplayResistantMessage memory) {
+        uint256 nonce = signatureVerifier.latestNonce(user.addr) + 1;
+
+        return
+            SignatureVerifier.ReplayResistantMessage({
+                number: message,
+                deadline: block.timestamp + DEADLINE_EXTENSION,
+                nonce: nonce
+            });
+    }
+
+    function _signMessageReplayResistant(
+        uint256 message
+    ) internal view returns (uint8, bytes32, bytes32) {
+        SignatureVerifier.ReplayResistantMessage
+            memory replayResistantMessage = getReplayResistantMessageStruct(
+                message
+            );
+
+        bytes1 prefix = bytes1(0x19);
+        bytes1 eip712Version = bytes1(0x01);
+
+        bytes32 hashedMessageStruct = keccak256(
+            abi.encode(
+                signatureVerifier.REPLAY_RESISTANT_MESSAGE_TYPEHASH(),
+                replayResistantMessage
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                prefix,
+                eip712Version,
                 signatureVerifier.i_domain_separator(),
                 hashedMessageStruct
             )
